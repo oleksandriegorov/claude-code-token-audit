@@ -157,7 +157,7 @@ def write_log(log_dir: Path, label: str, summary: str,
     line = (
         f"[{timestamp}] {label} {summary} - "
         f"prompt: {prompt_tok}, response: {response_tok}, "
-        f"inter_in: {intermediate_in_tok}, inter_out: {intermediate_out_tok}.\n"
+        f"intermediate_prompt: {intermediate_in_tok}, intermediate_response: {intermediate_out_tok}.\n"
     )
     with open(log_dir / "token_audit.log", "a") as f:
         f.write(line)

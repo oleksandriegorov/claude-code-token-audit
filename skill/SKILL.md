@@ -6,13 +6,18 @@ description: |
   Haiku-generated summary to ~/.claude/logs/<session_id>/token_audit.log after every
   turn. Sub-agent usage is attributed to the parent session. Log path shown in status bar.
   Use when setting up a new Claude Code installation or re-installing after a reset.
+  Also use when the user asks about token usage, how many tokens were used, current
+  session token count, or wants a token usage report for the current or any session.
 ---
 
 # Skill: token-audit-setup
 
 Configure the token audit feature in this Claude Code installation. This feature fires a Stop hook after every conversation turn to log per-turn token usage (prompt / response / intermediate) and a short summary to a per-session log file. Sub-agent token usage is attributed to the parent session via a SubagentStop hook. The log path is shown in the status bar.
 
-When the user invokes `/token-audit-setup`, execute all steps below sequentially. Report the outcome of each step before moving on.
+**This skill handles two distinct tasks — read the user's request and follow the matching section:**
+
+- User asks to **set up / install / configure** token audit → follow the Setup steps below
+- User asks about **token usage / how many tokens / session stats** → follow the Reporting section at the bottom
 
 ---
 
@@ -194,10 +199,54 @@ After all steps succeed, tell the user:
 > 4. Run: `cat ~/.claude/logs/<session_id>/token_audit.log`
 >
 > Each line shows:
-> - Main turns: `[timestamp] [ Main ] <summary> - prompt: N, response: N, intermediate: N.`
-> - Sub-agent turns: `[timestamp] [ Agent - <type>: <description> ] <summary> - prompt: N, response: N, intermediate: N.`
+> - Main turns: `[timestamp] [ Main ] <summary> - prompt: N, response: N, inter_in: N, inter_out: N.`
+> - Sub-agent turns: `[timestamp] [ Agent - <type>: <description> ] <summary> - prompt: N, response: N, inter_in: N, inter_out: N.`
 >
 > The Stop hook runs synchronously — the log entry is guaranteed to be written before you can type the next message.
 >
 > Reference: `~/.claude/docs/token-audit.md` for full documentation and troubleshooting.
 > Reference: `~/.claude/docs/token-audit-lessons-learned.md` for bugs encountered during development.
+
+---
+
+## Reporting — Count session token usage
+
+Use this section when the user asks how many tokens were used, wants a usage summary, or asks about token counts for the current or any session.
+
+**Step 1 — Find the log file.**
+
+The current session log path is shown in the status bar. If the user doesn't provide a path, run:
+
+```bash
+find ~/.claude/logs -name "token_audit.log" | xargs ls -t | head -5
+```
+
+Use the most recent one, or the one matching the session ID the user mentions.
+
+**Step 2 — Run the counting script:**
+
+```bash
+# All entries in most recent log
+uv run --quiet python3 ~/.claude/hooks/count_tokens.py
+
+# Filter by date — accepts 'today', 'yesterday', or 'YYYY-MM-DD'
+uv run --quiet python3 ~/.claude/hooks/count_tokens.py today
+uv run --quiet python3 ~/.claude/hooks/count_tokens.py yesterday
+uv run --quiet python3 ~/.claude/hooks/count_tokens.py 2026-04-22
+
+# Specific log file or session ID, optionally filtered
+uv run --quiet python3 ~/.claude/hooks/count_tokens.py <session_id_or_path>
+uv run --quiet python3 ~/.claude/hooks/count_tokens.py <session_id_or_path> today
+```
+
+Arguments can be given in any order — the script distinguishes dates from log paths automatically.
+
+**Step 3 — Present the results** in a clean table. Explain the fields:
+
+- `prompt` — input tokens at turn start (context window size)
+- `response` — output tokens for the final answer
+- `inter_in` — input tokens from context reloads per tool call (the expensive part)
+- `inter_out` — output tokens from tool call generation (usually small)
+- `intermediate` — old-format combined value, appears in logs before the inter_in/inter_out split was introduced; dominated by input
+
+Note: if the log contains old-format entries (with `intermediate` instead of `inter_in`/`inter_out`), the input/output split is only partial — mention this to the user.

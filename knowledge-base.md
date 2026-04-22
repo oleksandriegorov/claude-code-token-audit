@@ -5,8 +5,8 @@
 The token audit feature gives you per-turn token visibility after every Claude Code conversation turn. After each response, a Stop hook fires and writes one log line to a session-specific file:
 
 ```
-[2026-04-22 10:38:16] [ Main ] User asking about the current president of Poland - prompt: 34009, response: 27, inter_in: 0, inter_out: 0.
-[2026-04-22 10:22:54] [ Agent - general-purpose: Current president of Ukraine ] Current president of Ukraine - prompt: 7542, response: 26, inter_in: 0, inter_out: 0.
+[2026-04-22 10:38:16] [ Main ] User asking about the current president of Poland - prompt: 34009, response: 27, intermediate_prompt: 0, intermediate_response: 0.
+[2026-04-22 10:22:54] [ Agent - general-purpose: Current president of Ukraine ] Current president of Ukraine - prompt: 7542, response: 26, intermediate_prompt: 0, intermediate_response: 0.
 ```
 
 **Why it matters:** Claude Code sessions can silently accumulate enormous token counts through tool use, subagent spawning, and context reloading. A single "simple" turn may appear cheap on the surface while its intermediate rounds cost 10–50× what the final response cost. Without per-turn accounting you have no signal for when a session is becoming expensive or when to start a fresh context.
@@ -202,15 +202,15 @@ usages = [(inp_0, out_0), (inp_1, out_1), ..., (inp_n, out_n)]
 
 prompt        = inp_0                        # initial context load
 response      = out_n                        # tokens in the final human-visible answer
-inter_in      = inp_1 + inp_2 + ... + inp_n  # context reloads per tool call
-inter_out     = out_0 + out_1 + ... + out_{n-1}  # tool call generation cost
+intermediate_prompt      = inp_1 + inp_2 + ... + inp_n  # context reloads per tool call
+intermediate_response     = out_0 + out_1 + ... + out_{n-1}  # tool call generation cost
 ```
 
 **Interpretation:**
 - `prompt` — baseline cost of starting this turn (context window size signal); grows slowly as conversation history accumulates
 - `response` — actual answer generation cost (usually small)
-- `inter_in` — the dominant hidden cost; each tool call reloads the full context: N tool calls → N× context size
-- `inter_out` — cheap by comparison; just the tokens spent generating tool call syntax and intermediate reasoning
+- `intermediate_prompt` — the dominant hidden cost; each tool call reloads the full context: N tool calls → N× context size
+- `intermediate_response` — cheap by comparison; just the tokens spent generating tool call syntax and intermediate reasoning
 
 Cache tokens (`cache_read_input_tokens`, `cache_creation_input_tokens`) are included in `inp` counts to give a faithful view of total context processed regardless of caching.
 
